@@ -4,21 +4,28 @@ const usuarioCtrl = require('../controllers/usuario.controller');
 const authCtrl = require('../controllers/auth-controller');
 
 // --- RUTAS PÚBLICAS ---
+// Para registrar un nuevo usuario con el formulario
 router.post('/', usuarioCtrl.createUsuario);
+
+// Para iniciar sesión con email y contraseña
 router.post('/login', usuarioCtrl.loginUsuario);
 
-// --- RUTAS PROTEGIDAS ---
+// Para registrarse o iniciar sesión con Google
+router.post('/google-signin', usuarioCtrl.googleSignIn);
 
-// Solo el admin puede ver TODOS los usuarios y ELIMINARLOS
+
+// --- RUTAS PROTEGIDAS (Requieren Token) ---
+
+// Obtener todos los usuarios (solo administradores)
 router.get('/', [authCtrl.verifyToken, authCtrl.esAdministrador], usuarioCtrl.getUsuarios);
+
+// Desactivar un usuario (solo administradores)
 router.delete('/:id', [authCtrl.verifyToken, authCtrl.esAdministrador], usuarioCtrl.deleteUsuario);
 
-
-// Un usuario puede ver perfiles (suyo o de otros)
+// Obtener un usuario específico por su ID
 router.get('/:id', authCtrl.verifyToken, usuarioCtrl.getUsuarioById);
 
-// ¡MODIFICADO! Esta ruta ahora solo verifica que haya un token.
-// La lógica de permisos para actualizar está dentro del controlador.
+// Actualizar un usuario (permisos manejados dentro del controlador)
 router.put('/:id', authCtrl.verifyToken, usuarioCtrl.updateUsuario);
 
 
