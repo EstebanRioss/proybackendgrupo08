@@ -1,73 +1,88 @@
 const Usuario = require('../models/usuario');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const emailService = require('../services/email.service');
 
 const usuarioCtrl = {};
 
-// --- 1. REGISTRO CON FORMULARIO ---
 usuarioCtrl.createUsuario = async (req, res) => {
     try {
-        // CORRECCIÓN: Se espera "contraseña" (con ñ)
         const { nombre, apellido, email, contraseña, rol } = req.body;
-
-        const existeUsuario = await Usuario.findOne({ email });
-        if (existeUsuario) {
-            if (existeUsuario.googleId) {
-                return res.status(400).json({ msg: 'Este email ya fue registrado con Google. Por favor, inicia sesión con Google.' });
-            }
+        if (await Usuario.findOne({ email })) {
             return res.status(400).json({ msg: 'El email ya está en uso.' });
         }
-
-        const nuevoUsuario = new Usuario({ nombre, apellido, email, contraseña });
         
-        const salt = await bcrypt.genSalt(10);
-        nuevoUsuario.contraseña = await bcrypt.hash(contraseña, salt);
+        const tokenConfirmacion = crypto.randomBytes(32).toString('hex');
+        const nuevoUsuario = new Usuario({ ...req.body, tokenConfirmacion });
 
-        if (rol) nuevoUsuario.rol = rol;
+        // --- CAMBIO CLAVE ---
+        // Ahora, tanto 'organizador' como 'administrador' necesitan aprobación.
+        if (rol === 'organizador' || rol === 'administrador') {
+            nuevoUsuario.estadoAprobacion = 'pendiente';
+        }
+
+        nuevoUsuario.contraseña = await bcrypt.hash(contraseña, 10);
         await nuevoUsuario.save();
-        res.status(201).json({ msg: 'Usuario registrado exitosamente.' });
+
+        // El correo de confirmación se envía a todos
+        await emailService.enviarCorreoConfirmacion(nuevoUsuario.email, tokenConfirmacion);
+
+        // La notificación al admin se envía para ambos roles que requieren aprobación
+        if (rol === 'organizador' || rol === 'administrador') {
+            const admins = await Usuario.find({ rol: 'administrador' });
+            admins.forEach(admin => {
+                // Evita que el sistema se notifique a sí mismo si un admin se registra
+                if(admin.email !== nuevoUsuario.email) {
+                    emailService.notificarAdminNuevoOrganizador(admin.email, nuevoUsuario);
+                }
+            });
+        }
+        
+        res.status(201).json({ msg: 'Registro exitoso. Revisa tu correo para confirmar tu cuenta.' });
 
     } catch (error) {
         res.status(400).json({ msg: 'Error al registrar el usuario.', error: error.message });
     }
 };
 
-// --- 2. LOGIN CON FORMULARIO ---
+// --- 2. LOGIN (LÓGICA DE ROLES CORREGIDA) ---
 usuarioCtrl.loginUsuario = async (req, res) => {
     try {
-        // CORRECCIÓN: Se espera "contraseña" (con ñ)
         const { email, contraseña } = req.body;
         const usuario = await Usuario.findOne({ email });
 
         if (!usuario || !usuario.contraseña) {
-            if (usuario && usuario.googleId) {
-                return res.json({ status: '0', msg: "Esta cuenta fue creada con Google. Por favor, usa el botón de 'Iniciar sesión con Google'." });
-            }
             return res.json({ status: '0', msg: "Email o contraseña incorrectos." });
         }
         
-        const match = await bcrypt.compare(contraseña, usuario.contraseña);
-        if (!match) {
-            return res.json({ status: '0', msg: "Email o contraseña incorrectos." });
+        if (!usuario.confirmado) {
+            return res.json({ status: '0', msg: 'Debes confirmar tu email para poder iniciar sesión.' });
         }
         
+        // --- CAMBIO CLAVE ---
+        // La validación de aprobación ahora aplica a ambos roles.
+        if ((usuario.rol === 'organizador' || usuario.rol === 'administrador') && usuario.estadoAprobacion !== 'aprobado') {
+             return res.json({ status: '0', msg: `Tu cuenta con rol '${usuario.rol}' está ${usuario.estadoAprobacion}. Contacta a un administrador.` });
+        }
+
         if (!usuario.estado) {
-            return res.json({ status: '0', msg: "Tu cuenta está desactivada." });
+            return res.json({ status: '0', msg: "Tu cuenta ha sido desactivada." });
         }
 
-        const token = jwt.sign({ id: usuario._id }, "secretkey", { expiresIn: 60 * 60 * 24 });
-
-        res.json({
-            status: '1', msg: 'Login exitoso.', userId: usuario._id, email: usuario.email,
-            rol: usuario.rol, token: token
-        });
+        if (!await bcrypt.compare(contraseña, usuario.contraseña)) {
+            return res.json({ status: '0', msg: "Email o contraseña incorrectos." });
+        }
+        
+        const token = jwt.sign({ id: usuario._id }, "secretkey", { expiresIn: '24h' });
+        res.json({ status: '1', msg: 'Login exitoso.', token, userId: usuario._id, rol: usuario.rol });
 
     } catch (error) {
         res.status(500).json({ status: '0', msg: 'Error en el servidor.', error: error.message });
     }
 };
 
-// --- 3. LOGIN / REGISTRO CON GOOGLE ---
+// --- 3. LOGIN / REGISTRO CON GOOGLE (FUNCIÓN AÑADIDA) ---
 usuarioCtrl.googleSignIn = async (req, res) => {
     try {
         const { email, name, sub } = req.body;
@@ -85,11 +100,12 @@ usuarioCtrl.googleSignIn = async (req, res) => {
                 email,
                 googleId: sub,
                 rol: 'usuario',
+                confirmado: true // Las cuentas de Google se confirman automáticamente
             });
             await usuario.save();
         }
         
-        const token = jwt.sign({ id: usuario._id }, "secretkey", { expiresIn: 60 * 60 * 24 });
+        const token = jwt.sign({ id: usuario._id }, "secretkey", { expiresIn: '24h' });
 
         res.json({
             status: '1', msg: 'Login con Google exitoso.', userId: usuario._id, email: usuario.email,
@@ -101,7 +117,48 @@ usuarioCtrl.googleSignIn = async (req, res) => {
     }
 };
 
-// --- 4. OTRAS FUNCIONES CRUD ---
+// --- 4. CONFIRMAR EMAIL ---
+usuarioCtrl.confirmarEmail = async (req, res) => {
+    try {
+        const usuario = await Usuario.findOne({ tokenConfirmacion: req.params.token });
+        if (!usuario) return res.status(404).json({ msg: 'Token no válido o expirado.' });
+
+        usuario.confirmado = true;
+        usuario.tokenConfirmacion = null;
+        await usuario.save();
+
+        let msg = '¡Cuenta confirmada exitosamente!';
+        if (usuario.rol === 'organizador') msg += ' Tu solicitud será revisada por un administrador.';
+        
+        res.json({ msg });
+
+    } catch (error) {
+        res.status(500).json({ msg: 'Error al confirmar la cuenta.', error: error.message });
+    }
+};
+
+// --- 5. APROBAR ORGANIZADOR (PARA ADMINS) ---
+usuarioCtrl.aprobarRol = async (req, res) => {
+    try {
+        const usuarioAprobar = await Usuario.findById(req.params.id);
+        if (!usuarioAprobar) {
+            return res.status(404).json({ msg: 'Usuario no encontrado.' });
+        }
+        
+        if (usuarioAprobar.rol === 'usuario') {
+            return res.status(400).json({ msg: 'Los usuarios normales no requieren aprobación.' });
+        }
+
+        usuarioAprobar.estadoAprobacion = 'aprobado';
+        await usuarioAprobar.save();
+        // Opcional: Enviar un email al usuario notificándole que su cuenta fue aprobada.
+        res.json({ msg: `El usuario con rol '${usuarioAprobar.rol}' ha sido aprobado correctamente.` });
+    } catch (error) {
+        res.status(400).json({ msg: 'Error procesando la operación.', error: error.message });
+    }
+};
+
+// --- 6. OBTENER TODOS LOS USUARIOS (FUNCIÓN AÑADIDA) ---
 usuarioCtrl.getUsuarios = async (req, res) => {
     try {
         const usuarios = await Usuario.find().select('-contraseña -googleId');
@@ -111,6 +168,7 @@ usuarioCtrl.getUsuarios = async (req, res) => {
     }
 };
 
+// --- 7. OBTENER USUARIO POR ID (FUNCIÓN AÑADIDA) ---
 usuarioCtrl.getUsuarioById = async (req, res) => {
     try {
         const usuario = await Usuario.findById(req.params.id).select('-contraseña -googleId');
@@ -121,6 +179,7 @@ usuarioCtrl.getUsuarioById = async (req, res) => {
     }
 };
 
+// --- 8. DESACTIVAR USUARIO (FUNCIÓN AÑADIDA) ---
 usuarioCtrl.deleteUsuario = async (req, res) => {
     try {
         const { id } = req.params;
@@ -134,10 +193,12 @@ usuarioCtrl.deleteUsuario = async (req, res) => {
     }
 };
 
+// --- 9. ACTUALIZAR USUARIO (FUNCIÓN AÑADIDA) ---
 usuarioCtrl.updateUsuario = async (req, res) => {
     try {
         const userIdToModify = req.params.id;
-        const requesterId = req.userId;
+        // La ID del solicitante viene del token verificado por el middleware
+        const requesterId = req.userId; 
         const requester = await Usuario.findById(requesterId);
 
         if (!requester) {
@@ -162,6 +223,5 @@ usuarioCtrl.updateUsuario = async (req, res) => {
         res.status(400).json({ msg: 'Error procesando la operación.', error: error.message });
     }
 };
-
 
 module.exports = usuarioCtrl;

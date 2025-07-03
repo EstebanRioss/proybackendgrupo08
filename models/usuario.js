@@ -14,7 +14,14 @@ const UsuarioSchema = new Schema({
         default: 'usuario'
     },
     estado: { type: Boolean, default: true },
-    telefono: { type: String, required: false }
+    telefono: { type: String, required: false },
+    confirmado: { type: Boolean, default: false },
+    tokenConfirmacion: { type: String, default: null },
+    estadoAprobacion: {
+        type: String,
+        enum: ['pendiente', 'aprobado', 'rechazado'],
+        default: 'aprobado'
+    }
 });
 
 module.exports = mongoose.model('Usuario', UsuarioSchema);
