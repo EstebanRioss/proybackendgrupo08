@@ -4,14 +4,16 @@ const categoriaCtrl = {};
 // Crear nueva categoría
 categoriaCtrl.crearCategoria = async (req, res) => {
     try {
+        const { userRol } = req;
+        if (userRol !== 'administrador') {
+            return res.status(403).json({ msg: 'Solo los administradores pueden crear categorías.' });
+        }
+
         const nuevaCategoria = new CategoriaEvento(req.body);
-        const categoriaGuardada = await nuevaCategoria.save();
-        res.json({
-        status: '1',
-        msg: 'categoria guardado.'
-        });
+        await nuevaCategoria.save();
+        res.status(201).json({ msg: 'Categoría creada correctamente.', categoria: nuevaCategoria });
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ msg: 'Error al crear la categoría.', error: error.message });
     }
 };
 
@@ -39,29 +41,34 @@ categoriaCtrl.obtenerCategoriaPorId = async (req, res) => {
 // Actualizar categoría
 categoriaCtrl.actualizarCategoria = async (req, res) => {
     try {
-        const categoriaActualizada = await CategoriaEvento.findByIdAndUpdate(
-            req.params.id,
-            req.body,
-            { new: true, runValidators: true }
-        );
-        if (!categoriaActualizada) return res.status(404).json({ error: 'Categoría no encontrada' });
-        res.json({
-        status: '1',
-        msg: 'Evento actualizado.'
-        });
+        const { userRol } = req;
+        if (userRol !== 'administrador') {
+            return res.status(403).json({ msg: 'Solo los administradores pueden editar categorías.' });
+        }
+
+        const categoria = await CategoriaEvento.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        if (!categoria) return res.status(404).json({ msg: 'Categoría no encontrada.' });
+
+        res.json({ msg: 'Categoría actualizada correctamente.', categoria });
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ msg: 'Error al actualizar la categoría.', error: error.message });
     }
 };
 
 // Eliminar categoría
 categoriaCtrl.eliminarCategoria = async (req, res) => {
     try {
+        const { userRol } = req;
+        if (userRol !== 'administrador') {
+            return res.status(403).json({ msg: 'Solo los administradores pueden eliminar categorías.' });
+        }
+
         const categoria = await CategoriaEvento.findByIdAndDelete(req.params.id);
-        if (!categoria) return res.status(404).json({ error: 'Categoría no encontrada' });
-        res.status(200).json({ mensaje: 'Categoría eliminada correctamente' });
+        if (!categoria) return res.status(404).json({ msg: 'Categoría no encontrada.' });
+
+        res.json({ msg: 'Categoría eliminada correctamente.' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ msg: 'Error al eliminar la categoría.', error: error.message });
     }
 };
 
