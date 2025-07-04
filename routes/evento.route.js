@@ -7,6 +7,7 @@ router.get('/', eventoCtrl.getEventos);
 router.get('/proximos', eventoCtrl.getProximosEventos);
 router.get('/nuevos', eventoCtrl.getNuevosEventos);
 router.get('/:id', eventoCtrl.getEvento);
+router.get('/eventos/organizador/:organizadorId', eventoCtrl.getEventosPorOrganizador);
 
 
 router.post('/', authCtrl.verifyToken, eventoCtrl.createEvento);

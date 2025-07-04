@@ -11,6 +11,23 @@ eventoCtrl.getEventos = async (req, res) => {
     }
 };
 
+eventoCtrl.getEventosPorOrganizador = async (req, res) => {
+  try {
+    const { organizadorId } = req.params;  // Lo recibís por parámetro de la ruta
+
+    if (!organizadorId) {
+      return res.status(400).json({ msg: 'Falta el ID del organizador' });
+    }
+
+    // Buscar eventos cuyo organizadorId coincida con el recibido
+    const eventos = await Evento.find({ organizadorId: organizadorId });
+
+    res.json(eventos);
+  } catch (error) {
+    res.status(500).json({ msg: 'Error al obtener los eventos.', error: error.message });
+  }
+};
+
 // Obtener un evento por ID
 eventoCtrl.getEvento = async (req, res) => {
   try {
