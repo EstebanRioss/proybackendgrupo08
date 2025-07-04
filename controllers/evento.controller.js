@@ -4,8 +4,10 @@ const eventoCtrl = {};
 // Obtener todos los eventos
 eventoCtrl.getEventos = async (req, res) => {
   try {
-        const eventos = await Evento.find();
-        res.json(eventos);
+        const eventos = await Evento.find()
+          .populate('categoriaId', 'nombre')
+          .populate('organizadorId', 'nombre email')
+          .then(eventos => res.json(eventos))
     } catch (error) {
         res.status(500).json({ msg: 'Error al obtener los eventos.', error: error.message });
     }
