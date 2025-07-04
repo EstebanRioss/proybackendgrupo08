@@ -20,7 +20,7 @@ const UsuarioSchema = new Schema({
     estadoAprobacion: {
         type: String,
         enum: ['pendiente', 'aprobado', 'rechazado'],
-        default: 'aprobado'
+        default: 'pendiente'
     }
 });
 
