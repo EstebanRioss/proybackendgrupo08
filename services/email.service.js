@@ -61,5 +61,24 @@ emailService.notificarAdminNuevoOrganizador = async (adminEmail, nuevoUsuario) =
         console.error("Error al notificar al admin con Nodemailer:", error.message);
     }
 };
+emailService.enviarCorreoCambioContrasena = async (email, nombre) => {
+    const emailDePrueba = '47082520@fi.unju.edu.ar'; // Tu email de prueba
+
+    try {
+        const info = await transporter.sendMail({
+            from: '"Alerta de Seguridad - Eventos PYSW" <onboarding@resend.dev>',
+            to: emailDePrueba, // Enviar al email de prueba
+            subject: `Alerta: Tu contraseña ha sido cambiada para ${email}`,
+            html: `<p>Hola, <strong>${nombre}</strong>.</p>
+                   <p>Te informamos que la contraseña de tu cuenta ha sido cambiada exitosamente.</p>
+                   <p>Si no realizaste este cambio, por favor, contacta a soporte inmediatamente.</p>
+                   <p>(Este correo fue enviado a la bandeja de prueba del desarrollador. Originalmente para: ${email}).</p>`
+        });
+
+        console.log(`Correo de notificación de cambio de contraseña para ${email} enviado a la bandeja de prueba. Message ID:`, info.messageId);
+    } catch (error) {
+        console.error("Error al notificar cambio de contraseña con Nodemailer:", error.message);
+    }
+};
 
 module.exports = emailService;
