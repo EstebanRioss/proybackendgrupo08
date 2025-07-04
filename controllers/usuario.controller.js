@@ -161,7 +161,7 @@ usuarioCtrl.aprobarRol = async (req, res) => {
 // --- 6. OBTENER TODOS LOS USUARIOS (FUNCIÓN AÑADIDA) ---
 usuarioCtrl.getUsuarios = async (req, res) => {
     try {
-        const usuarios = await Usuario.find().select('-contraseña -googleId');
+        const usuarios = await Usuario.find().select('-contraseña');
         res.json(usuarios);
     } catch (error) {
         res.status(500).json({ msg: 'Error obteniendo los usuarios.' });
