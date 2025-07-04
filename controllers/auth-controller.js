@@ -40,4 +40,21 @@ authCtrl.esAdministrador = async (req, res, next) => {
     }
 };
 
+authCtrl.esOrganizadorOAdmin = async (req, res, next) => {
+    try {
+        const usuario = await Usuario.findById(req.userId);
+
+        if (!usuario) {
+            return res.status(404).json({ 'status': '0', 'msg': 'Usuario no encontrado.' });
+        }
+        if (usuario.rol === 'organizador' || usuario.rol === 'administrador') {
+            next();
+        } else {
+            return res.status(403).json({ 'status': '0', 'msg': 'Acceso denegado. Se requiere rol de organizador.' });
+        }
+    } catch (error) {
+        return res.status(500).json({ 'status': '0', 'msg': 'Error del servidor al verificar el rol.' });
+    }
+};
+
 module.exports = authCtrl;
