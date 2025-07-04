@@ -19,5 +19,6 @@ router.get('/', [authCtrl.verifyToken, authCtrl.esAdministrador], usuarioCtrl.ge
 router.delete('/:id', [authCtrl.verifyToken, authCtrl.esAdministrador], usuarioCtrl.deleteUsuario);
 router.get('/:id', authCtrl.verifyToken, usuarioCtrl.getUsuarioById);
 router.put('/:id', authCtrl.verifyToken, usuarioCtrl.updateUsuario);
+router.put('/cambiar-contrasena/:id', authCtrl.verifyToken, usuarioCtrl.cambiarContrasena);
 
 module.exports = router;

@@ -161,7 +161,7 @@ usuarioCtrl.aprobarRol = async (req, res) => {
 // --- 6. OBTENER TODOS LOS USUARIOS (FUNCIÓN AÑADIDA) ---
 usuarioCtrl.getUsuarios = async (req, res) => {
     try {
-        const usuarios = await Usuario.find().select('-contraseña -googleId');
+        const usuarios = await Usuario.find().select('-contraseña');
         res.json(usuarios);
     } catch (error) {
         res.status(500).json({ msg: 'Error obteniendo los usuarios.' });
@@ -223,5 +223,44 @@ usuarioCtrl.updateUsuario = async (req, res) => {
         res.status(400).json({ msg: 'Error procesando la operación.', error: error.message });
     }
 };
+usuarioCtrl.cambiarContrasena = async (req, res) => {
+    try {
+        const userIdFromToken = req.userId; // ID del usuario que hace la petición (viene del token)
+        const userIdFromParams = req.params.id; // ID que viene en la URL
+        const { contrasenaActual, nuevaContrasena } = req.body;
 
+        // Medida de seguridad: Asegurarse que un usuario solo pueda cambiar su propia contraseña.
+        if (userIdFromToken !== userIdFromParams) {
+            return res.status(403).json({ msg: 'Acceso denegado. No tienes permiso para esta acción.' });
+        }
+        
+        const usuario = await Usuario.findById(userIdFromToken);
+        if (!usuario) {
+            return res.status(404).json({ msg: 'Usuario no encontrado.' });
+        }
+
+        // Verificar si el usuario se registró con Google (no tienen contraseña para cambiar)
+        if (!usuario.contraseña) {
+            return res.status(400).json({ msg: 'Los usuarios registrados con Google no pueden cambiar su contraseña de esta forma.' });
+        }
+
+        // Comparar la contraseña actual proporcionada con la almacenada en la BD
+        const esMatch = await bcrypt.compare(contrasenaActual, usuario.contraseña);
+        if (!esMatch) {
+            return res.status(400).json({ msg: 'La contraseña actual es incorrecta.' });
+        }
+
+        // Hashear la nueva contraseña
+        usuario.contraseña = await bcrypt.hash(nuevaContrasena, 10);
+        await usuario.save();
+
+        // Enviar email de notificación
+        await emailService.enviarCorreoCambioContrasena(usuario.email, usuario.nombre);
+
+        res.json({ msg: 'Contraseña actualizada con éxito.' });
+
+    } catch (error) {
+        res.status(500).json({ msg: 'Error procesando la operación.', error: error.message });
+    }
+};
 module.exports = usuarioCtrl;
