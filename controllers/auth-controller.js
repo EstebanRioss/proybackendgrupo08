@@ -22,6 +22,7 @@ authCtrl.verifyToken = async (req, res, next) => {
     }
 };
 
+
 authCtrl.esAdministrador = async (req, res, next) => {
     try {
         const usuario = await Usuario.findById(req.userId);

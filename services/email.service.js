@@ -1,32 +1,25 @@
 const nodemailer = require('nodemailer');
-
-console.log('Clave de API de Resend para Nodemailer:', process.env.RESEND_API_KEY ? 'Cargada correctamente' : 'ERROR: NO CARGADA');
+require('dotenv').config();
 
 const transporter = nodemailer.createTransport({
-    host: 'smtp.resend.com', 
-    port: 465,               
-    secure: true,            
+    service: "gmail",            
     auth: {
-        user: 'resend',
-        pass: process.env.RESEND_API_KEY
+        user: process.env.user,
+        pass: process.env.pass,
     }
 });
 
 const emailService = {};
 
 emailService.enviarCorreoConfirmacion = async (email, token) => {
-    const confirmacionUrl = `${process.env.FRONTEND_URL}/confirmar-email/${token}`;
-
-    const emailDePrueba = '47082520@fi.unju.edu.ar';
-
     try {
         const info = await transporter.sendMail({
-            from: '"Eventos PYSW" <onboarding@resend.dev>', 
-            to: emailDePrueba,
+            from: process.env.user, 
+            to: email,
             subject: `Confirma tu cuenta para ${email}`,
             html: `<p>¡Gracias por registrarte, <strong>${email}</strong>!</p>
                    <p>Por favor, haz clic en el siguiente enlace para activar tu cuenta:</p>
-                   <p><a href="${confirmacionUrl}" style="color: blue; text-decoration: underline;"><strong>Confirmar mi cuenta</strong></a></p>
+                   <p>Tu codigo es ${token}</p>
                    <p>(Este correo fue enviado a la bandeja de prueba del desarrollador).</p>`
         });
 
@@ -39,13 +32,11 @@ emailService.enviarCorreoConfirmacion = async (email, token) => {
 };
 
 emailService.notificarAdminNuevoOrganizador = async (adminEmail, nuevoUsuario) => {
-    const adminPanelUrl = `${process.env.FRONTEND_URL}/admin/usuarios`; 
-    const emailDePrueba = '47082520@fi.unju.edu.ar';
     
     try {
         const info = await transporter.sendMail({
-            from: '"Alerta del Sistema" <onboarding@resend.dev>',
-            to: emailDePrueba,
+            from: process.env.user,
+            to: adminEmail,
             subject: `Alerta: Nuevo Usuario [${nuevoUsuario.rol}] Requiere Aprobación`,
             html: `<p>Un nuevo usuario se ha registrado como <strong>${nuevoUsuario.rol}</strong> y requiere tu aprobación.</p>
                    <ul>
@@ -62,12 +53,11 @@ emailService.notificarAdminNuevoOrganizador = async (adminEmail, nuevoUsuario) =
     }
 };
 emailService.enviarCorreoCambioContrasena = async (email, nombre) => {
-    const emailDePrueba = '47082520@fi.unju.edu.ar'; // Tu email de prueba
 
     try {
         const info = await transporter.sendMail({
-            from: '"Alerta de Seguridad - Eventos PYSW" <onboarding@resend.dev>',
-            to: emailDePrueba, // Enviar al email de prueba
+            from: '"Alerta de Seguridad - Eventos PYSW" process.env.pass',
+            to: email, // Enviar al email de prueba
             subject: `Alerta: Tu contraseña ha sido cambiada para ${email}`,
             html: `<p>Hola, <strong>${nombre}</strong>.</p>
                    <p>Te informamos que la contraseña de tu cuenta ha sido cambiada exitosamente.</p>

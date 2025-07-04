@@ -13,7 +13,7 @@ usuarioCtrl.createUsuario = async (req, res) => {
             return res.status(400).json({ msg: 'El email ya está en uso.' });
         }
         
-        const tokenConfirmacion = crypto.randomBytes(32).toString('hex');
+        const tokenConfirmacion = (parseInt(crypto.randomBytes(3).toString('hex'), 16) % 900000 + 100000).toString();
         const nuevoUsuario = new Usuario({ ...req.body, tokenConfirmacion });
 
         // --- CAMBIO CLAVE ---
@@ -123,7 +123,7 @@ usuarioCtrl.confirmarEmail = async (req, res) => {
         const usuario = await Usuario.findOne({ tokenConfirmacion: req.params.token });
         if (!usuario) return res.status(404).json({ msg: 'Token no válido o expirado.' });
 
-        usuario.confirmado = true;
+        usuario.estadoAprobacion = 'aprobado';
         usuario.tokenConfirmacion = null;
         await usuario.save();
 
@@ -263,4 +263,6 @@ usuarioCtrl.cambiarContrasena = async (req, res) => {
         res.status(500).json({ msg: 'Error procesando la operación.', error: error.message });
     }
 };
+
+    
 module.exports = usuarioCtrl;
