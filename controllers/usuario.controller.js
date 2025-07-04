@@ -124,6 +124,7 @@ usuarioCtrl.confirmarEmail = async (req, res) => {
         if (!usuario) return res.status(404).json({ msg: 'Token no válido o expirado.' });
 
         usuario.estadoAprobacion = 'aprobado';
+        usuario.confirmado = true;
         usuario.tokenConfirmacion = null;
         await usuario.save();
 

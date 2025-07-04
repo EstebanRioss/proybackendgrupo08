@@ -5,9 +5,6 @@ const categoriaCtrl = {};
 categoriaCtrl.crearCategoria = async (req, res) => {
     try {
         const { userRol } = req;
-        if (userRol !== 'administrador') {
-            return res.status(403).json({ msg: 'Solo los administradores pueden crear categorías.' });
-        }
 
         const nuevaCategoria = new CategoriaEvento(req.body);
         await nuevaCategoria.save();
@@ -42,9 +39,6 @@ categoriaCtrl.obtenerCategoriaPorId = async (req, res) => {
 categoriaCtrl.actualizarCategoria = async (req, res) => {
     try {
         const { userRol } = req;
-        if (userRol !== 'administrador') {
-            return res.status(403).json({ msg: 'Solo los administradores pueden editar categorías.' });
-        }
 
         const categoria = await CategoriaEvento.findByIdAndUpdate(req.params.id, req.body, { new: true });
         if (!categoria) return res.status(404).json({ msg: 'Categoría no encontrada.' });
@@ -59,9 +53,6 @@ categoriaCtrl.actualizarCategoria = async (req, res) => {
 categoriaCtrl.eliminarCategoria = async (req, res) => {
     try {
         const { userRol } = req;
-        if (userRol !== 'administrador') {
-            return res.status(403).json({ msg: 'Solo los administradores pueden eliminar categorías.' });
-        }
 
         const categoria = await CategoriaEvento.findByIdAndDelete(req.params.id);
         if (!categoria) return res.status(404).json({ msg: 'Categoría no encontrada.' });

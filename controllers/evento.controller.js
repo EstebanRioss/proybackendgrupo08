@@ -43,12 +43,7 @@ eventoCtrl.getEvento = async (req, res) => {
 eventoCtrl.createEvento = async (req, res) => {
   const evento = new Evento(req.body);
   try {
-        const { userId, userRol } = req;
-        if (userRol !== 'organizador' && userRol !== 'administrador') {
-            return res.status(403).json({ msg: 'No tienes permiso para crear eventos.' });
-        }
-
-        const nuevoEvento = new Evento({ ...req.body, organizadorId: userId });
+        const nuevoEvento = new Evento({ ...req.body,organizadorId: req.userId});
         await nuevoEvento.save();
         res.status(201).json({ msg: 'Evento creado correctamente.', evento: nuevoEvento });
   } catch (error) {
@@ -63,9 +58,6 @@ eventoCtrl.editEvento = async (req, res) => {
         const { userId, userRol } = req;
 
         if (!evento) return res.status(404).json({ msg: 'Evento no encontrado.' });
-        if (evento.organizadorId.toString() !== userId && userRol !== 'administrador') {
-            return res.status(403).json({ msg: 'No tienes permiso para editar este evento.' });
-        }
 
         Object.assign(evento, req.body);
         await evento.save();
@@ -82,9 +74,6 @@ eventoCtrl.deleteEvento = async (req, res) => {
         const { userId, userRol } = req;
 
         if (!evento) return res.status(404).json({ msg: 'Evento no encontrado.' });
-        if (evento.creador.toString() !== userId && userRol !== 'administrador') {
-            return res.status(403).json({ msg: 'No tienes permiso para eliminar este evento.' });
-        }
 
         await evento.remove();
         res.json({ msg: 'Evento eliminado correctamente.' });
