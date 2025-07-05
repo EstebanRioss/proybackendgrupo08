@@ -276,5 +276,4 @@ usuarioCtrl.cambiarContrasena = async (req, res) => {
         res.status(500).json({ msg: 'Error procesando la operación.', error: error.message });
     }
 };
-
 module.exports = usuarioCtrl;
