@@ -1,22 +1,57 @@
 const Factura = require('../models/factura');
 const Entrada = require('../models/entrada');
+const mongoose = require('mongoose');
 const facturaCtrl = {};
 
-// Crear una nueva factura
+/**
+ * Crea una nueva factura y sus entradas asociadas en una única transacción.
+ * Espera un body con: { facturaData: {...}, entradas: [...] }
+ */
 facturaCtrl.createFactura = async (req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
-        const usuarioId = req.userId; // ID del usuario autenticado
+        const usuarioId = req.userId;
+        const { facturaData, entradas } = req.body;
+
+        if (!facturaData || !entradas || !Array.isArray(entradas) || entradas.length === 0) {
+            throw new Error('Datos de factura o lista de entradas inválidos.');
+        }
+
+        // 1. Crear la factura
         const nuevaFactura = new Factura({
-            ...req.body,
+            ...facturaData,
             usuarioId: usuarioId
         });
-        await nuevaFactura.save();
+        const facturaGuardada = await nuevaFactura.save({ session });
+
+        // 2. Preparar las entradas para asociarlas a la nueva factura
+        const entradasParaCrear = entradas.map(entrada => ({
+            ...entrada,
+            facturaId: facturaGuardada._id,
+            usuarioId: usuarioId, // El dueño de la entrada es el mismo que el de la factura
+            estado: 'vendida'
+        }));
+
+        // 3. Insertar todas las entradas en lote
+        const entradasCreadas = await Entrada.insertMany(entradasParaCrear, { session });
+
+        // 4. Si todo fue bien, confirmar la transacción
+        await session.commitTransaction();
+
         res.status(201).json({
             msg: 'Factura creada exitosamente',
-            factura: nuevaFactura
+            factura: facturaGuardada,
+            entradas: entradasCreadas
         });
     } catch (error) {
+        // 5. Si algo falló, revertir todos los cambios
+        await session.abortTransaction();
         res.status(400).json({ msg: 'Error al crear la factura', error: error.message });
+    } finally {
+        // 6. Cerrar la sesión
+        session.endSession();
     }
 };
 
@@ -99,4 +134,3 @@ facturaCtrl.deleteFactura = async (req, res) => {
 };
 
 module.exports = facturaCtrl;
-

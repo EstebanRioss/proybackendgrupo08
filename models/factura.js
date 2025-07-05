@@ -23,15 +23,15 @@ const FacturaSchema = new Schema({
         sparse: true
     },
     // --- Relaciones ---
-    entradaId: {
+    usuarioId: {
         type: Schema.Types.ObjectId,
-        ref: 'Entrada',
-        required: [true, 'La factura debe estar asociada a alguna entrada']
+        ref: 'Usuario',
+        required: [true, 'La factura debe estar asociada a un usuario']
     }
+    // La relación con Entrada es inversa y se establece en el modelo Entrada (campo facturaId).
     }, {
     timestamps: true,
     versionKey: false
 });
 
 module.exports = mongoose.model('Factura', FacturaSchema);
-
