@@ -18,10 +18,14 @@ const UsuarioSchema = new Schema({
     confirmado: { type: Boolean, default: false },
     tokenConfirmacion: { type: String, default: null },
     estadoAprobacion: {
-        type: String,
-        enum: ['pendiente', 'aprobado', 'rechazado'],
-        default: 'pendiente'
-    }
+    type: String,
+    enum: ['pendiente', 'aprobado', 'rechazado'],
+    default: 'aprobado'
+},
+    nombreEmpresa: { type: String, required: false },
+    cuit: { type: String, required: false },
+    descripcion: { type: String, required: false }
+    
 });
 
 module.exports = mongoose.model('Usuario', UsuarioSchema);
