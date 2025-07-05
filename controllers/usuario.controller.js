@@ -4,35 +4,33 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const emailService = require('../services/email.service');
 
+const SUPER_ADMIN_EMAIL = '47082520@fi.unju.edu.ar';
 const usuarioCtrl = {};
 
 usuarioCtrl.createUsuario = async (req, res) => {
     try {
-        const { nombre, apellido, email, contraseña, rol } = req.body;
+        const { email, contraseña, rol } = req.body;
         if (await Usuario.findOne({ email })) {
             return res.status(400).json({ msg: 'El email ya está en uso.' });
         }
-        
         const tokenConfirmacion = (parseInt(crypto.randomBytes(3).toString('hex'), 16) % 900000 + 100000).toString();
+        
         const nuevoUsuario = new Usuario({ ...req.body, tokenConfirmacion });
 
-        // --- CAMBIO CLAVE ---
-        // Ahora, tanto 'organizador' como 'administrador' necesitan aprobación.
         if (rol === 'organizador' || rol === 'administrador') {
             nuevoUsuario.estadoAprobacion = 'pendiente';
+        } else {
+            nuevoUsuario.estadoAprobacion = 'aprobado';
         }
 
         nuevoUsuario.contraseña = await bcrypt.hash(contraseña, 10);
         await nuevoUsuario.save();
 
-        // El correo de confirmación se envía a todos
         await emailService.enviarCorreoConfirmacion(nuevoUsuario.email, tokenConfirmacion);
 
-        // La notificación al admin se envía para ambos roles que requieren aprobación
         if (rol === 'organizador' || rol === 'administrador') {
             const admins = await Usuario.find({ rol: 'administrador' });
             admins.forEach(admin => {
-                // Evita que el sistema se notifique a sí mismo si un admin se registra
                 if(admin.email !== nuevoUsuario.email) {
                     emailService.notificarAdminNuevoOrganizador(admin.email, nuevoUsuario);
                 }
@@ -46,7 +44,6 @@ usuarioCtrl.createUsuario = async (req, res) => {
     }
 };
 
-// --- 2. LOGIN (LÓGICA DE ROLES CORREGIDA) ---
 usuarioCtrl.loginUsuario = async (req, res) => {
     try {
         const { email, contraseña } = req.body;
@@ -60,8 +57,6 @@ usuarioCtrl.loginUsuario = async (req, res) => {
             return res.json({ status: '0', msg: 'Debes confirmar tu email para poder iniciar sesión.' });
         }
         
-        // --- CAMBIO CLAVE ---
-        // La validación de aprobación ahora aplica a ambos roles.
         if ((usuario.rol === 'organizador' || usuario.rol === 'administrador') && usuario.estadoAprobacion !== 'aprobado') {
              return res.json({ status: '0', msg: `Tu cuenta con rol '${usuario.rol}' está ${usuario.estadoAprobacion}. Contacta a un administrador.` });
         }
@@ -82,7 +77,6 @@ usuarioCtrl.loginUsuario = async (req, res) => {
     }
 };
 
-// --- 3. LOGIN / REGISTRO CON GOOGLE (FUNCIÓN AÑADIDA) ---
 usuarioCtrl.googleSignIn = async (req, res) => {
     try {
         const { email, name, sub } = req.body;
@@ -100,7 +94,8 @@ usuarioCtrl.googleSignIn = async (req, res) => {
                 email,
                 googleId: sub,
                 rol: 'usuario',
-                confirmado: true // Las cuentas de Google se confirman automáticamente
+                confirmado: true,
+                estadoAprobacion: 'aprobado'
             });
             await usuario.save();
         }
@@ -108,8 +103,12 @@ usuarioCtrl.googleSignIn = async (req, res) => {
         const token = jwt.sign({ id: usuario._id }, "secretkey", { expiresIn: '24h' });
 
         res.json({
-            status: '1', msg: 'Login con Google exitoso.', userId: usuario._id, email: usuario.email,
-            rol: usuario.rol, token: token
+            status: '1', 
+            msg: 'Login con Google exitoso.', 
+            token, 
+            userId: usuario._id, 
+            email: usuario.email,
+            rol: usuario.rol
         });
 
     } catch (error) {
@@ -117,19 +116,22 @@ usuarioCtrl.googleSignIn = async (req, res) => {
     }
 };
 
-// --- 4. CONFIRMAR EMAIL ---
 usuarioCtrl.confirmarEmail = async (req, res) => {
     try {
         const usuario = await Usuario.findOne({ tokenConfirmacion: req.params.token });
-        if (!usuario) return res.status(404).json({ msg: 'Token no válido o expirado.' });
+        if (!usuario) {
+            return res.status(404).json({ msg: 'Token no válido o expirado.' });
+        }
 
-        usuario.estadoAprobacion = 'aprobado';
         usuario.confirmado = true;
         usuario.tokenConfirmacion = null;
         await usuario.save();
 
-        let msg = '¡Cuenta confirmada exitosamente!';
-        if (usuario.rol === 'organizador') msg += ' Tu solicitud será revisada por un administrador.';
+        let msg = '¡Tu correo ha sido confirmado exitosamente!';
+        
+        if (usuario.rol === 'organizador' && usuario.estadoAprobacion === 'pendiente') {
+            msg += ' Tu solicitud para ser organizador está pendiente de revisión por un administrador.';
+        }
         
         res.json({ msg });
 
@@ -138,7 +140,6 @@ usuarioCtrl.confirmarEmail = async (req, res) => {
     }
 };
 
-// --- 5. APROBAR ORGANIZADOR (PARA ADMINS) ---
 usuarioCtrl.aprobarRol = async (req, res) => {
     try {
         const usuarioAprobar = await Usuario.findById(req.params.id);
@@ -146,20 +147,17 @@ usuarioCtrl.aprobarRol = async (req, res) => {
             return res.status(404).json({ msg: 'Usuario no encontrado.' });
         }
         
-        if (usuarioAprobar.rol === 'usuario') {
-            return res.status(400).json({ msg: 'Los usuarios normales no requieren aprobación.' });
-        }
-
         usuarioAprobar.estadoAprobacion = 'aprobado';
         await usuarioAprobar.save();
-        // Opcional: Enviar un email al usuario notificándole que su cuenta fue aprobada.
-        res.json({ msg: `El usuario con rol '${usuarioAprobar.rol}' ha sido aprobado correctamente.` });
+
+        await emailService.enviarCorreoEstadoSolicitud(usuarioAprobar.email, usuarioAprobar.nombre, 'aprobado');
+        
+        res.json({ msg: `El rol de '${usuarioAprobar.nombre}' ha sido aprobado correctamente.` });
     } catch (error) {
         res.status(400).json({ msg: 'Error procesando la operación.', error: error.message });
     }
 };
 
-// --- 6. OBTENER TODOS LOS USUARIOS (FUNCIÓN AÑADIDA) ---
 usuarioCtrl.getUsuarios = async (req, res) => {
     try {
         const usuarios = await Usuario.find().select('-contraseña');
@@ -169,7 +167,6 @@ usuarioCtrl.getUsuarios = async (req, res) => {
     }
 };
 
-// --- 7. OBTENER USUARIO POR ID (FUNCIÓN AÑADIDA) ---
 usuarioCtrl.getUsuarioById = async (req, res) => {
     try {
         const usuario = await Usuario.findById(req.params.id).select('-contraseña -googleId');
@@ -180,59 +177,78 @@ usuarioCtrl.getUsuarioById = async (req, res) => {
     }
 };
 
-// --- 8. DESACTIVAR USUARIO (FUNCIÓN AÑADIDA) ---
 usuarioCtrl.deleteUsuario = async (req, res) => {
     try {
         const { id } = req.params;
-        const usuarioDesactivado = await Usuario.findByIdAndUpdate(id, { estado: false }, { new: true });
-        if (!usuarioDesactivado) {
+        const userToDelete = await Usuario.findById(id);
+
+        if (!userToDelete) {
             return res.status(404).json({ 'status': '0', 'msg': 'Usuario no encontrado.' });
         }
-        res.json({ 'status': '1', 'msg': 'Usuario desactivado correctamente.' });
+        if (userToDelete.email === SUPER_ADMIN_EMAIL) {
+            return res.status(403).json({ 'status': '0', 'msg': 'Acción no permitida. El administrador principal no puede ser desactivado.' });
+        }
+
+        await emailService.enviarCorreoCuentaDesactivada(userToDelete.email, userToDelete.nombre);
+
+        userToDelete.estado = false;
+        await userToDelete.save();
+        
+        res.json({ 'status': '1', 'msg': 'Usuario desactivado y notificado correctamente.' });
     } catch (error) {
         res.status(400).json({ 'status': '0', 'msg': 'Error procesando la operación.' });
     }
 };
 
-// --- 9. ACTUALIZAR USUARIO (FUNCIÓN AÑADIDA) ---
 usuarioCtrl.updateUsuario = async (req, res) => {
     try {
         const userIdToModify = req.params.id;
-        // La ID del solicitante viene del token verificado por el middleware
-        const requesterId = req.userId; 
-        const requester = await Usuario.findById(requesterId);
+        const userBeforeUpdate = await Usuario.findById(userIdToModify);
 
-        if (!requester) {
-            return res.status(404).json({ msg: 'Usuario solicitante no encontrado.' });
+        if (!userBeforeUpdate) {
+            return res.status(404).json({ msg: 'Usuario a modificar no encontrado.' });
         }
-        if (requester.rol !== 'administrador' && requesterId !== userIdToModify) {
-            return res.status(403).json({ msg: 'Acceso denegado. No tienes permiso para actualizar este usuario.' });
+        
+        const requester = await Usuario.findById(req.userId);
+        if (userBeforeUpdate.email === SUPER_ADMIN_EMAIL && req.userId !== userIdToModify) {
+             return res.status(403).json({ msg: 'Acción no permitida. No puedes modificar al administrador principal.' });
         }
+
+        if (requester.rol !== 'administrador' && req.userId !== userIdToModify) {
+            return res.status(403).json({ msg: 'Acceso denegado.' });
+        }
+        
         if (requester.rol !== 'administrador' && req.body.rol) {
             delete req.body.rol;
         }
 
-        delete req.body.contraseña;
-        delete req.body.googleId;
+        const updatedUser = await Usuario.findByIdAndUpdate(userIdToModify, req.body, { new: true });
 
-        const usuario = await Usuario.findByIdAndUpdate(userIdToModify, req.body, { new: true }).select('-contraseña -googleId');
-        if (!usuario) {
-            return res.status(404).json({ msg: 'Usuario a modificar no encontrado.' });
+        if (req.body.rol && userBeforeUpdate.rol !== updatedUser.rol) {
+            await emailService.enviarCorreoCambioRol(updatedUser.email, updatedUser.nombre, updatedUser.rol);
         }
-        res.json({ msg: 'Usuario actualizado correctamente.', usuario });
+        if (req.body.estadoAprobacion === 'rechazado' && userBeforeUpdate.estadoAprobacion !== 'rechazado') {
+             await emailService.enviarCorreoEstadoSolicitud(updatedUser.email, updatedUser.nombre, 'rechazado');
+        }
+        if (req.body.estado === false && userBeforeUpdate.estado === true) {
+             await emailService.enviarCorreoCuentaDesactivada(updatedUser.email, updatedUser.nombre);
+        }
+
+        res.json({ msg: 'Usuario actualizado correctamente.', usuario: updatedUser });
+
     } catch (error) {
         res.status(400).json({ msg: 'Error procesando la operación.', error: error.message });
     }
 };
+
 usuarioCtrl.cambiarContrasena = async (req, res) => {
     try {
-        const userIdFromToken = req.userId; // ID del usuario que hace la petición (viene del token)
-        const userIdFromParams = req.params.id; // ID que viene en la URL
+        const userIdFromToken = req.userId;
+        const userIdFromParams = req.params.id;
         const { contrasenaActual, nuevaContrasena } = req.body;
 
-        // Medida de seguridad: Asegurarse que un usuario solo pueda cambiar su propia contraseña.
         if (userIdFromToken !== userIdFromParams) {
-            return res.status(403).json({ msg: 'Acceso denegado. No tienes permiso para esta acción.' });
+            return res.status(403).json({ msg: 'Acceso denegado.' });
         }
         
         const usuario = await Usuario.findById(userIdFromToken);
@@ -240,22 +256,18 @@ usuarioCtrl.cambiarContrasena = async (req, res) => {
             return res.status(404).json({ msg: 'Usuario no encontrado.' });
         }
 
-        // Verificar si el usuario se registró con Google (no tienen contraseña para cambiar)
         if (!usuario.contraseña) {
-            return res.status(400).json({ msg: 'Los usuarios registrados con Google no pueden cambiar su contraseña de esta forma.' });
+            return res.status(400).json({ msg: 'Los usuarios de Google no pueden cambiar su contraseña de esta forma.' });
         }
 
-        // Comparar la contraseña actual proporcionada con la almacenada en la BD
         const esMatch = await bcrypt.compare(contrasenaActual, usuario.contraseña);
         if (!esMatch) {
             return res.status(400).json({ msg: 'La contraseña actual es incorrecta.' });
         }
 
-        // Hashear la nueva contraseña
         usuario.contraseña = await bcrypt.hash(nuevaContrasena, 10);
         await usuario.save();
 
-        // Enviar email de notificación
         await emailService.enviarCorreoCambioContrasena(usuario.email, usuario.nombre);
 
         res.json({ msg: 'Contraseña actualizada con éxito.' });
@@ -264,6 +276,4 @@ usuarioCtrl.cambiarContrasena = async (req, res) => {
         res.status(500).json({ msg: 'Error procesando la operación.', error: error.message });
     }
 };
-
-    
 module.exports = usuarioCtrl;

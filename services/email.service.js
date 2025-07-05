@@ -1,16 +1,21 @@
+// email.service.js
+
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
+// 1. Configuración del transportador de correo
+//    Utiliza el servicio de Gmail y credenciales desde variables de entorno.
+//    Es fundamental usar una "Contraseña de Aplicación" de Google si tenés 2FA activado.
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
         user: process.env.user,
-        pass: process.env.pass,
+        pass: process.env.pass, 
     }
 });
 
-const emailService = {};
-
+// 2. Función auxiliar para crear plantillas de correo HTML
+//    Centraliza el diseño de los correos para mantener la consistencia.
 const crearPlantillaCorreo = (titulo, cuerpo) => {
     return `
     <!DOCTYPE html>
@@ -41,7 +46,16 @@ const crearPlantillaCorreo = (titulo, cuerpo) => {
     `;
 };
 
+// 3. Objeto que encapsula y exporta todas las funciones del servicio
+const emailService = {};
 
+// --- Definición de las funciones del servicio ---
+
+/**
+ * Envía un correo para que el usuario confirme su cuenta con un token.
+ * @param {string} email - Email del destinatario.
+ * @param {string} token - Token de 6 dígitos para la confirmación.
+ */
 emailService.enviarCorreoConfirmacion = async (email, token) => {
     const titulo = "Confirma tu Cuenta";
     const cuerpo = `
@@ -53,6 +67,11 @@ emailService.enviarCorreoConfirmacion = async (email, token) => {
     await transporter.sendMail({ from: process.env.user, to: email, subject: titulo, html });
 };
 
+/**
+ * Notifica a un administrador sobre una nueva solicitud de rol de organizador.
+ * @param {string} adminEmail - Email del administrador a notificar.
+ * @param {object} nuevoUsuario - Objeto del usuario que solicita el rol.
+ */
 emailService.notificarAdminNuevoOrganizador = async (adminEmail, nuevoUsuario) => {
     const titulo = "Nueva Solicitud de Organizador";
     const cuerpo = `
@@ -70,6 +89,12 @@ emailService.notificarAdminNuevoOrganizador = async (adminEmail, nuevoUsuario) =
     await transporter.sendMail({ from: process.env.user, to: adminEmail, subject: `Alerta: Solicitud de Rol [${nuevoUsuario.nombre}]`, html });
 };
 
+/**
+ * Informa a un usuario si su solicitud de rol fue aprobada o rechazada.
+ * @param {string} email - Email del usuario.
+ * @param {string} nombre - Nombre del usuario.
+ * @param {'aprobado'|'rechazado'} estado - El estado de la solicitud.
+ */
 emailService.enviarCorreoEstadoSolicitud = async (email, nombre, estado) => {
     let titulo = '';
     let cuerpo = '';
@@ -79,7 +104,7 @@ emailService.enviarCorreoEstadoSolicitud = async (email, nombre, estado) => {
         cuerpo = `
             <p>Hola, <strong>${nombre}</strong>.</p>
             <p>¡Felicidades! Tu solicitud para convertirte en <strong>organizador</strong> en nuestra plataforma ha sido aprobada.</p>
-            <p>Ya puedes iniciar sesión y comenzar a crear y gestionar tus eventos.</p>
+            <p>Ya podés iniciar sesión y comenzar a crear y gestionar tus eventos.</p>
             <a href="${process.env.FRONTEND_URL || '#'}/login" class="button">Iniciar Sesión</a>
         `;
     } else {
@@ -87,35 +112,62 @@ emailService.enviarCorreoEstadoSolicitud = async (email, nombre, estado) => {
         cuerpo = `
             <p>Hola, <strong>${nombre}</strong>.</p>
             <p>Te informamos que, tras una revisión, tu solicitud para convertirte en organizador ha sido rechazada en esta ocasión.</p>
-            <p>Si crees que esto es un error o deseas más información, por favor, contacta a nuestro equipo de soporte.</p>
+            <p>Si creés que esto es un error o deseás más información, por favor, contactá a nuestro equipo de soporte.</p>
         `;
     }
     const html = crearPlantillaCorreo(titulo, cuerpo);
     await transporter.sendMail({ from: process.env.user, to: email, subject: titulo, html });
 };
 
+/**
+ * Notifica a un usuario sobre un cambio de rol en su cuenta.
+ * @param {string} email - Email del usuario.
+ * @param {string} nombre - Nombre del usuario.
+ * @param {string} nuevoRol - El nuevo rol asignado.
+ */
 emailService.enviarCorreoCambioRol = async (email, nombre, nuevoRol) => {
     const titulo = "Tu Rol ha sido Actualizado";
     const cuerpo = `
         <p>Hola, <strong>${nombre}</strong>.</p>
         <p>Te informamos que un administrador ha actualizado tu rol en nuestra plataforma.</p>
         <p>Tu nuevo rol es: <strong>${nuevoRol}</strong>.</p>
-        <p>Si tienes alguna pregunta sobre este cambio, no dudes en contactar a soporte.</p>
+        <p>Si tenés alguna pregunta sobre este cambio, no dudes en contactar a soporte.</p>
     `;
     const html = crearPlantillaCorreo(titulo, cuerpo);
     await transporter.sendMail({ from: process.env.user, to: email, subject: titulo, html });
 };
 
+/**
+ * Informa a un usuario que su cuenta ha sido desactivada.
+ * @param {string} email - Email del usuario.
+ * @param {string} nombre - Nombre del usuario.
+ */
 emailService.enviarCorreoCuentaDesactivada = async (email, nombre) => {
     const titulo = "Tu Cuenta ha sido Desactivada";
     const cuerpo = `
         <p>Hola, <strong>${nombre}</strong>.</p>
         <p>Te informamos que tu cuenta ha sido desactivada por un administrador.</p>
-        <p>No podrás iniciar sesión ni acceder a nuestros servicios. Si consideras que esto es un error, por favor, contacta a nuestro equipo de soporte.</p>
+        <p>No podrás iniciar sesión ni acceder a nuestros servicios. Si considerás que esto es un error, por favor, contactá a nuestro equipo de soporte.</p>
     `;
     const html = crearPlantillaCorreo(titulo, cuerpo);
     await transporter.sendMail({ from: process.env.user, to: email, subject: titulo, html });
 };
 
+/**
+ * Confirma a un usuario que su contraseña fue cambiada exitosamente.
+ * @param {string} email - Email del usuario.
+ * @param {string} nombre - Nombre del usuario.
+ */
+emailService.enviarCorreoCambioContrasena = async (email, nombre) => {
+    const titulo = "Tu Contraseña ha sido Cambiada";
+    const cuerpo = `
+        <p>Hola, <strong>${nombre}</strong>.</p>
+        <p>Te informamos que la contraseña de tu cuenta ha sido actualizada con éxito.</p>
+        <p>Si no realizaste este cambio, por favor, contactá a nuestro equipo de soporte de inmediato.</p>
+    `;
+    const html = crearPlantillaCorreo(titulo, cuerpo);
+    await transporter.sendMail({ from: process.env.user, to: email, subject: titulo, html });
+};
 
+// 4. Exportación del objeto del servicio para que pueda ser usado en otros archivos
 module.exports = emailService;
