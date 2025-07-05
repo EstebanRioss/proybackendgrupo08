@@ -14,6 +14,9 @@ app.use(cors({ origin: 'http://localhost:4200' }));
 app.use('/api/eventos', require('./routes/evento.route.js'));
 app.use('/api/usuarios', require('./routes/usuario.route.js')); 
 app.use('/api/categoria', require('./routes/categoriaEvento.route.js'));
+app.use('/api/entradas', require('./routes/entrada.route.js'));
+app.use('/api/facturas', require('./routes/factura.route.js'));
+
 
 // Configuración del puerto
 app.set('port', process.env.PORT || 3000);
