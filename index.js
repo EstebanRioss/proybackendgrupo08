@@ -16,6 +16,7 @@ app.use('/api/usuarios', require('./routes/usuario.route.js'));
 app.use('/api/categoria', require('./routes/categoriaEvento.route.js'));
 app.use('/api/entradas', require('./routes/entrada.route.js'));
 app.use('/api/facturas', require('./routes/factura.route.js'));
+app.use('/api/mp', require('./routes/mp.route.js'));
 
 
 // Configuración del puerto

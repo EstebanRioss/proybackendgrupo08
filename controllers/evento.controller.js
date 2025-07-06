@@ -69,19 +69,36 @@ eventoCtrl.editEvento = async (req, res) => {
     }
 };
 
+eventoCtrl.activarEvento = async (req, res) => {
+  try {
+    const evento = await Evento.findById(req.params.id);
+    if (!evento) return res.status(404).json({ msg: 'Evento no encontrado.' });
+
+    evento.estado = true;
+    await evento.save();
+
+    res.json({ msg: 'Evento activado correctamente.' });
+  } catch (error) {
+    res.status(400).json({ msg: 'Error al activar el evento.', error: error.message });
+  }
+};
+
 // Eliminar un evento
 eventoCtrl.deleteEvento = async (req, res) => {
-   try {
-        const evento = await Evento.findById(req.params.id);
-        const { userId, userRol } = req;
+  try {
+    const evento = await Evento.findById(req.params.id);
+    const { userId, userRol } = req;
 
-        if (!evento) return res.status(404).json({ msg: 'Evento no encontrado.' });
+    if (!evento) return res.status(404).json({ msg: 'Evento no encontrado.' });
 
-        await evento.remove();
-        res.json({ msg: 'Evento eliminado correctamente.' });
-    } catch (error) {
-        res.status(400).json({ msg: 'Error al eliminar el evento.', error: error.message });
-    }
+    // Cambiar estado a false para desactivar en lugar de eliminar
+    evento.estado = false;
+    await evento.save();
+
+    res.json({ msg: 'Evento desactivado correctamente.' });
+  } catch (error) {
+    res.status(400).json({ msg: 'Error al desactivar el evento.', error: error.message });
+  }
 };
 
 // Obtener 3 eventos más recientes (nuevos eventos)

@@ -1,5 +1,11 @@
 const mongoose = require('mongoose');
 
+const entradaSchema = new mongoose.Schema({
+  tipo: { type: String, required: true },
+  precio: { type: Number, required: true },
+  cantidad: { type: Number, required: true }
+}, { _id: false });
+
 const eventoSchema = new mongoose.Schema({
   nombre: { type: String, required: true },
   descripcion: String,
@@ -11,7 +17,8 @@ const eventoSchema = new mongoose.Schema({
   imagenUrl: String,
   estado: { type: Boolean, default: true },
   categoriaId: { type: mongoose.Schema.Types.ObjectId, ref: 'CategoriaEvento' },
-  organizadorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' }
+  organizadorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Usuario' },
+  entradas: [entradaSchema]
 },{ timestamps: true });
 
 module.exports = mongoose.model('Evento', eventoSchema);
