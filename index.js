@@ -8,9 +8,7 @@ const app = express();
 
 const allowedOrigins = [process.env.FRONTEND_URL];
 
-app.use(cors({
-  origin: allowedOrigins
-}));
+app.use(cors());
 
 // Middlewares
 app.use(express.json());
