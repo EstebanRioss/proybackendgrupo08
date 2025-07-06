@@ -6,9 +6,14 @@ const nodemailer = require("nodemailer")
 
 const app = express();
 
+const allowedOrigins = [process.env.FRONTEND_URL];
+
+app.use(cors({
+  origin: allowedOrigins
+}));
+
 // Middlewares
 app.use(express.json());
-app.use(cors({ origin: 'http://localhost:4200' }));
 
 // Rutas
 app.use('/api/eventos', require('./routes/evento.route.js'));
