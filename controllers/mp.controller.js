@@ -187,45 +187,52 @@ mpCtrl.receiveWebhook = async (req, res) => {
         const entradas = [];
 
         if (Array.isArray(factura.entradas) && factura.entradas.length > 0) {
-        // Caso buyCart (varias entradas)
-        factura.entradas.forEach(({ tipoEntrada, cantidad, precioUnitario }) => {
-          for (let i = 0; i < cantidad; i++) {
+          // Caso carrito (varias entradas)
+          for (const { tipoEntrada, cantidad, precioUnitario } of factura.entradas) {
+            for (let i = 0; i < cantidad; i++) {
+              entradas.push(new Entrada({
+                nombre: `${tipoEntrada} para ${factura.eventName}`,
+                precio: precioUnitario,
+                tipo: tipoEntrada,
+                estado: "vendida",
+                usuarioId: factura.usuarioId,
+                facturaId: factura._id,
+                eventoId: factura.eventoId
+              }));
+            }
+          }
+        } else {
+          // Caso entrada única
+          for (let i = 0; i < factura.cantidad; i++) {
             entradas.push(new Entrada({
-              nombre: `${tipoEntrada} para ${factura.eventName}`,
-              precio: precioUnitario,
-              tipo: tipoEntrada,
+              nombre: `${factura.tipoEntrada} para ${factura.eventName}`,
+              precio: factura.precioUnitario,
+              tipo: factura.tipoEntrada,
               estado: "vendida",
               usuarioId: factura.usuarioId,
               facturaId: factura._id,
               eventoId: factura.eventoId
             }));
           }
-        });
-      } else {
-        // Caso buyTicket (una sola entrada)
-        for (let i = 0; i < factura.cantidad; i++) {
-          entradas.push(new Entrada({
-            nombre: `${factura.tipoEntrada} para ${factura.eventName}`,
-            precio: factura.precioUnitario,
-            tipo: factura.tipoEntrada,
-            estado: "vendida",
-            usuarioId: factura.usuarioId,
-            facturaId: factura._id,
-            eventoId: factura.eventoId
-          }));
+        }
+
+        // Guardar todas las entradas en DB
+        const entradasGuardadas = await Entrada.insertMany(entradas);
+
+        // Generar QR para cada entrada y actualizar
+        for (const entrada of entradasGuardadas) {
+          try {
+            const qrURL = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(entrada._id.toString())}&size=200x200&format=png`;
+            const response = await axios.get(qrURL, { responseType: 'arraybuffer' });
+            const qrBase64 = `data:image/png;base64,${Buffer.from(response.data).toString('base64')}`;
+
+            entrada.qr = qrBase64;
+            await entrada.save();
+          } catch (error) {
+            console.error('Error generando o guardando QR para la entrada:', entrada._id, error.message);
+          }
         }
       }
-
-      await Entrada.insertMany(entradas);
-      for (const entrada of entradasGuardadas) {
-        const qrURL = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(entrada._id.toString())}&size=200x200&format=png`;
-        const response = await axios.get(qrURL, { responseType: 'arraybuffer' });
-        const qrBase64 = `data:image/png;base64,${Buffer.from(response.data, 'binary').toString('base64')}`;
-
-        entrada.qr = qrBase64;
-        await entrada.save();
-      }
-    }
 
     return res.status(200).send("ok");
     } catch (error) {

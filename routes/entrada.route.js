@@ -4,7 +4,7 @@ const entradaCtrl = require('../controllers/entrada.controller');
 const authCtrl = require('../controllers/auth-controller');
 
 // [POST] /api/entradas - Crear una nueva entrada (requiere que el usuario esté autenticado)
-router.post('/', authCtrl.verifyToken, entradaCtrl.createEntrada);
+router.post('/', entradaCtrl.createEntrada);
 
 // [GET] /api/entradas - Obtener todas las entradas (solo para administradores)
 router.get('/', [authCtrl.verifyToken, authCtrl.esAdministrador], entradaCtrl.getEntradas);
@@ -23,3 +23,4 @@ router.put('/:id', [authCtrl.verifyToken, authCtrl.esAdministrador], entradaCtrl
 router.delete('/:id', [authCtrl.verifyToken, authCtrl.esAdministrador], entradaCtrl.deleteEntrada);
 
 module.exports = router;
+
