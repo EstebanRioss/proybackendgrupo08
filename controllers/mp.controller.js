@@ -217,9 +217,17 @@ mpCtrl.receiveWebhook = async (req, res) => {
       }
 
       await Entrada.insertMany(entradas);
+      for (const entrada of entradasGuardadas) {
+        const qrURL = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(entrada._id.toString())}&size=200x200&format=png`;
+        const response = await axios.get(qrURL, { responseType: 'arraybuffer' });
+        const qrBase64 = `data:image/png;base64,${Buffer.from(response.data, 'binary').toString('base64')}`;
+
+        entrada.qr = qrBase64;
+        await entrada.save();
+      }
     }
 
-      return res.status(200).send("ok");
+    return res.status(200).send("ok");
     } catch (error) {
       console.error("Error al procesar webhook:", error.response?.data || error.message);
       return res.status(500).send("Error procesando notificación");
