@@ -14,7 +14,6 @@ const EntradaSchema = new Schema({
     tipo: {
         type: String,
         required: [true, 'El tipo de entrada es obligatorio'],
-        enum: ['Adulto', 'Niño', 'Estudiante', 'VIP', 'General']
     },
     qr: {
         type: String,

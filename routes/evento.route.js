@@ -12,6 +12,7 @@ router.get('/eventos/organizador/:organizadorId', eventoCtrl.getEventosPorOrgani
 
 router.post('/', authCtrl.verifyToken, eventoCtrl.createEvento);
 router.put('/:id', [authCtrl.verifyToken, authCtrl.esAdministrador], eventoCtrl.editEvento);
-router.delete('/:id', [authCtrl.verifyToken, authCtrl.esAdministrador], eventoCtrl.deleteEvento);
+router.patch('/:id/activar', [authCtrl.verifyToken, authCtrl.esAdministrador], eventoCtrl.activarEvento);
+router.patch('/:id/desactivar', [authCtrl.verifyToken, authCtrl.esAdministrador], eventoCtrl.deleteEvento);
 
 module.exports = router;
