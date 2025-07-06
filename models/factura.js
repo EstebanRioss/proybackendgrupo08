@@ -6,6 +6,14 @@ const FacturaSchema = new Schema({
         type: Number,
         required: [true, 'El monto total es obligatorio']
     },
+    fecha: {
+        type: Date,
+        default: Date.now
+    },
+    detalles: {
+        type: String,
+        trim: true
+    },
     estado: {
         type: String,
         required: true,
@@ -21,7 +29,7 @@ const FacturaSchema = new Schema({
         type: String,
         trim: true,
         sparse: true
-    },
+    },    
     // --- Relaciones ---
     usuarioId: {
         type: Schema.Types.ObjectId,

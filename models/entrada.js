@@ -24,7 +24,7 @@ const EntradaSchema = new Schema({
     estado: {
         type: String,
         required: true,
-        enum: ['disponible', 'vendida', 'usada', 'cancelada'],
+        enum: ['disponible', 'vendida', 'usada', 'cancelada','pendiente'],
         default: 'disponible'
     },
     // --- Relaciones ---
