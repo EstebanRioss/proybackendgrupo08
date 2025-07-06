@@ -130,9 +130,9 @@ mpCtrl.buyTicket = async (req, res) => {
         }
       ],
       back_urls: {
-        failure: "http://localhost:4200/pago/fallido",
-        pending: "http://localhost:4200/pago/pendiente",
-        success: "http://localhost:4200/pago/exitoso"
+        failure: "https://pases-com.onrender.com/",
+        pending: "https://pases-com.onrender.com/",
+        success: "https://pases-com.onrender.com/"
       },
       external_reference: factura._id.toString()
     };
