@@ -77,11 +77,6 @@ facturaCtrl.getFacturaById = async (req, res) => {
             return res.status(404).json({ msg: 'Factura no encontrada' });
         }
 
-        // Autorización: solo el dueño o un admin pueden verla
-        if (userRol !== 'administrador' && factura.usuarioId._id.toString() !== userId) {
-            return res.status(403).json({ msg: 'Acceso denegado. No tienes permiso para ver esta factura.' });
-        }
-
         // Para cumplir la relación "Factura contiene Entradas", las buscamos
         const entradas = await Entrada.find({ facturaId: id }).populate('eventoId', 'nombre');
 

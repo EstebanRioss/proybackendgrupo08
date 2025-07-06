@@ -1,16 +1,18 @@
 const axios = require("axios");
 const crypto = require("crypto");
-const Entrada = require("../models/entrada");
 const Factura = require("../models/factura");
-
+const Entrada = require('../models/entrada');
+const entradaCtrl = require("./entrada.controller");
 const mpCtrl = {};
-
+/**
+ * Compra con carrito: varias entradas
+ */
 mpCtrl.buyCart = async (req, res) => {
   try {
     const {
-      eventoId,
       usuarioId,
-      entradas, // array: [{ tipoEntrada, cantidad, precioUnitario }]
+      entradas,
+      eventoId,
       eventName,
       eventDescription,
       imageUrl,
@@ -21,227 +23,234 @@ mpCtrl.buyCart = async (req, res) => {
       return res.status(400).json({ error: true, msg: "No hay entradas para procesar." });
     }
 
-    // Calcular total
     const total = entradas.reduce((acc, e) => acc + e.cantidad * e.precioUnitario, 0);
 
-    // Guardar la factura con el array completo de entradas
     const factura = new Factura({
+      usuarioId,
+      eventoId,
+      entradas,
       total,
       estado: "pendiente",
       metodoPago,
-      usuarioId,
-      eventoId,
-      entradas, // guardamos el array [{ tipoEntrada, cantidad, precioUnitario }]
-      eventName
+      eventName,
+      eventDescription,
+      imageUrl
     });
 
     await factura.save();
 
-    // Armar preferencia de pago para MercadoPago
     const items = entradas.map(({ tipoEntrada, cantidad, precioUnitario }) => ({
-      title: `Entrada para ${eventName} - ${tipoEntrada}`,
+      title: `${eventName} - Entrada ${tipoEntrada}`,
       description: eventDescription,
-      picture_url: imageUrl,
-      category_id: "tickets",
       quantity: cantidad,
-      unit_price: precioUnitario
+      unit_price: precioUnitario,
+      picture_url: imageUrl
     }));
 
-    const url = "https://api.mercadopago.com/checkout/preferences";
-    const body = {
-      items,
-      back_urls: {
-        failure: "http://localhost:4200/pago/fallido",
-        pending: "http://localhost:4200/pago/pendiente",
-        success: "http://localhost:4200/pago/exitoso"
+    const response = await axios.post(
+      "https://api.mercadopago.com/checkout/preferences",
+      {
+        items,
+        back_urls: {
+          failure: "https://pases-com.onrender.com/",
+          pending: "https://pases-com.onrender.com/",
+          success: "https://pases-com.onrender.com/"
+        },
+        external_reference: factura._id.toString()
       },
-      external_reference: factura._id.toString()
-    };
-
-    const response = await axios.post(url, body, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.ACCESS_TOKEN}`
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.ACCESS_TOKEN}`,
+          "Content-Type": "application/json"
+        }
       }
-    });
+    );
 
     factura.mpPreferenceId = response.data.id;
     await factura.save();
 
-    res.status(200).json({ preferenceId: response.data.id, initPoint: response.data.init_point });
+    res.status(200).json({
+      preferenceId: response.data.id,
+      initPoint: response.data.init_point
+    });
   } catch (error) {
-    console.error(error.response?.data || error.message);
+    console.error("Error en buyCart:", error.response?.data || error.message);
     res.status(500).json({ error: true, msg: "Error al generar enlace de compra" });
   }
 };
 
+// Compra entrada individual (una sola entrada)
 mpCtrl.buyTicket = async (req, res) => {
   try {
+    console.log("Body recibido en buyTicket:", req.body);
+    
     const {
-      eventoId,
       usuarioId,
       tipoEntrada,
       cantidad,
       precioUnitario,
+      eventoId,
       eventName,
       eventDescription,
       imageUrl,
       metodoPago = "Tarjeta de Crédito"
     } = req.body;
 
-    // Crear factura inicial con información necesaria
+    if (!cantidad || cantidad <= 0) {
+      return res.status(400).json({ error: true, msg: "Cantidad inválida" });
+    }
+
+    const total = cantidad * precioUnitario;
+
     const factura = new Factura({
-      total: cantidad * precioUnitario,
-      estado: "pendiente",
-      metodoPago,
       usuarioId,
-      eventoId,
       tipoEntrada,
       cantidad,
       precioUnitario,
-      eventName
+      eventoId,
+      eventName,
+      eventDescription,
+      imageUrl,
+      total,
+      estado: "pendiente",
+      metodoPago
     });
 
     await factura.save();
+    console.log("Factura guardada:", factura);
 
-    const url = "https://api.mercadopago.com/checkout/preferences";
-
-    const body = {
-      items: [
-        {
-          title: `Entrada para ${eventName} - ${tipoEntrada}`,
-          description: eventDescription,
-          picture_url: imageUrl,
-          category_id: "tickets",
-          quantity: cantidad,
-          unit_price: precioUnitario
-        }
-      ],
-      back_urls: {
-        failure: "https://pases-com.onrender.com/",
-        pending: "https://pases-com.onrender.com/",
-        success: "https://pases-com.onrender.com/"
-      },
-      external_reference: factura._id.toString()
-    };
-
-    const response = await axios.post(url, body, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.ACCESS_TOKEN}`
+    const items = [
+      {
+        title: `${eventName} - Entrada ${tipoEntrada}`,
+        description: eventDescription,
+        quantity: cantidad,
+        unit_price: precioUnitario,
+        picture_url: imageUrl
       }
-    });
+    ];
+
+    const response = await axios.post(
+      "https://api.mercadopago.com/checkout/preferences",
+      {
+        items,
+        back_urls: {
+          failure: "https://pases-com.onrender.com/",
+          pending: "https://pases-com.onrender.com/",
+          success: "https://pases-com.onrender.com/"
+        },
+        external_reference: factura._id.toString()
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.ACCESS_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
 
     factura.mpPreferenceId = response.data.id;
     await factura.save();
 
-    res.status(200).json({ preferenceId: response.data.id, initPoint: response.data.init_point });
+    res.status(200).json({
+      preferenceId: response.data.id,
+      initPoint: response.data.init_point
+    });
   } catch (error) {
-    console.error(error.response?.data || error.message);
+    console.error("Error en buyTicket:", error.response?.data || error.message);
     res.status(500).json({ error: true, msg: "Error al generar enlace de compra" });
   }
 };
 
-
+// Webhook para recibir notificaciones de MercadoPago
 mpCtrl.receiveWebhook = async (req, res) => {
-  // const signature = req.get("x-signature");
   const { type: webhookType, data } = req.body;
   const dataId = data?.id;
 
-  if (!dataId) return res.status(400).send("Faltan datos para la validación.");
-
-  // Firma deshabilitada para pruebas (porque MercadoPago no la manda)
-  // const [ts, hash] = signature ? signature.split(",") : [];
-  // const secret = process.env.WEBHOOK_SECRET;
-  // const manifest = `data_id:${dataId};ts:${ts};`;
-  // const hmac = crypto.createHmac("sha256", secret);
-  // hmac.update(manifest);
-  // const expectedHash = hmac.digest("hex");
-  // if (!crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(expectedHash))) {
-  //   console.error("Firma de Webhook inválida.");
-  //   return res.status(400).send("Invalid signature");
-  // }
-
-  if (webhookType === "payment") {
-    try {
-      const paymentInfo = await axios.get(`https://api.mercadopago.com/v1/payments/${dataId}`, {
-        headers: { Authorization: `Bearer ${process.env.ACCESS_TOKEN}` }
-      });
-
-      const payment = paymentInfo.data;
-      const facturaId = payment.external_reference;
-      if (!facturaId) return res.status(400).send("No external reference");
-
-      const factura = await Factura.findById(facturaId);
-      if (!factura) return res.status(404).send("Factura no encontrada");
-
-      let nuevoEstadoFactura = "pendiente";
-      if (payment.status === "approved") nuevoEstadoFactura = "pagada";
-      else if (["rejected", "cancelled"].includes(payment.status)) nuevoEstadoFactura = "cancelada";
-
-      factura.estado = nuevoEstadoFactura;
-      factura.transaccionId = dataId;
-      await factura.save();
-
-      if (nuevoEstadoFactura === "pagada") {
-        const entradas = [];
-
-        if (Array.isArray(factura.entradas) && factura.entradas.length > 0) {
-          // Caso carrito (varias entradas)
-          for (const { tipoEntrada, cantidad, precioUnitario } of factura.entradas) {
-            for (let i = 0; i < cantidad; i++) {
-              entradas.push(new Entrada({
-                nombre: `${tipoEntrada} para ${factura.eventName}`,
-                precio: precioUnitario,
-                tipo: tipoEntrada,
-                estado: "vendida",
-                usuarioId: factura.usuarioId,
-                facturaId: factura._id,
-                eventoId: factura.eventoId
-              }));
-            }
-          }
-        } else {
-          // Caso entrada única
-          for (let i = 0; i < factura.cantidad; i++) {
-            entradas.push(new Entrada({
-              nombre: `${factura.tipoEntrada} para ${factura.eventName}`,
-              precio: factura.precioUnitario,
-              tipo: factura.tipoEntrada,
-              estado: "vendida",
-              usuarioId: factura.usuarioId,
-              facturaId: factura._id,
-              eventoId: factura.eventoId
-            }));
-          }
-        }
-
-        // Guardar todas las entradas en DB
-        const entradasGuardadas = await Entrada.insertMany(entradas);
-
-        // Generar QR para cada entrada y actualizar
-        for (const entrada of entradasGuardadas) {
-          try {
-            const qrURL = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(entrada._id.toString())}&size=200x200&format=png`;
-            const response = await axios.get(qrURL, { responseType: 'arraybuffer' });
-            const qrBase64 = `data:image/png;base64,${Buffer.from(response.data).toString('base64')}`;
-
-            entrada.qr = qrBase64;
-            await entrada.save();
-          } catch (error) {
-            console.error('Error generando o guardando QR para la entrada:', entrada._id, error.message);
-          }
-        }
-      }
-
-    return res.status(200).send("ok");
-    } catch (error) {
-      console.error("Error al procesar webhook:", error.response?.data || error.message);
-      return res.status(500).send("Error procesando notificación");
-    }
+  if (webhookType !== "payment" || !dataId) {
+    return res.status(400).send("Datos de webhook inválidos");
   }
 
-  res.status(200).send("ok");
+  try {
+    const paymentInfo = await axios.get(
+      `https://api.mercadopago.com/v1/payments/${dataId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.ACCESS_TOKEN}`
+        }
+      }
+    );
+
+    const payment = paymentInfo.data;
+    const facturaId = payment.external_reference;
+    if (!facturaId) return res.status(400).send("No se encontró la referencia externa");
+
+    const factura = await Factura.findById(facturaId);
+    if (!factura) return res.status(404).send("Factura no encontrada");
+
+    // Actualizar estado según el resultado del pago
+    if (payment.status === "approved") {
+      factura.estado = "pagada";
+    } else if (["rejected", "cancelled"].includes(payment.status)) {
+      factura.estado = "cancelada";
+    }
+
+    factura.transaccionId = dataId;
+    await factura.save();
+
+    // Si no está pagada, respondemos OK y no generamos entradas
+    if (factura.estado !== "pagada") return res.sendStatus(200);
+
+    const entradasCreadas = [];
+
+    // Caso compra múltiple (carrito)
+    if (Array.isArray(factura.entradas) && factura.entradas.length > 0) {
+      for (const { tipoEntrada, cantidad, precioUnitario } of factura.entradas) {
+        for (let i = 0; i < cantidad; i++) {
+          const nuevaEntrada = new Entrada({
+            nombre: `${factura.eventName} - Entrada ${tipoEntrada}`,
+            tipo: tipoEntrada,
+            precio: precioUnitario,
+            usuarioId: factura.usuarioId,
+            facturaId: factura._id,
+            estado: "vendida",
+            eventName: factura.eventName,
+            eventDescription: factura.eventDescription,
+            imageUrl: factura.imageUrl
+          });
+
+          entradasCreadas.push(nuevaEntrada.save());
+        }
+      }
+    } 
+    // Caso compra individual
+    else if (factura.tipoEntrada && factura.cantidad && factura.precioUnitario) {
+      for (let i = 0; i < factura.cantidad; i++) {
+        const nuevaEntrada = new Entrada({
+          nombre: `${factura.eventName || ""} - Entrada ${factura.tipoEntrada}`,
+          tipo: factura.tipoEntrada,
+          precio: factura.precioUnitario,
+          usuarioId: factura.usuarioId,
+          facturaId: factura._id,
+          estado: "vendida",
+          eventName: factura.eventName,
+          eventDescription: factura.eventDescription,
+          imageUrl: factura.imageUrl
+        });
+
+        entradasCreadas.push(nuevaEntrada.save());
+      }
+    } else {
+      console.warn(`Factura ${factura._id} no tiene información válida para crear entradas.`);
+    }
+
+    await Promise.all(entradasCreadas);
+    console.log(`Se crearon ${entradasCreadas.length} entradas para factura ${factura._id}`);
+
+    return res.sendStatus(200);
+  } catch (error) {
+    console.error("Error procesando webhook:", error.response?.data || error.message);
+    return res.status(500).send("Error procesando notificación");
+  }
 };
 
 module.exports = mpCtrl;

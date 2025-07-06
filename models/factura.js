@@ -1,37 +1,67 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
+const EntradaCarritoSchema = new Schema({
+  tipoEntrada: {
+    type: String,
+    required: true
+  },
+  cantidad: {
+    type: Number,
+    required: true,
+    min: 1
+  },
+  precioUnitario: {
+    type: Number,
+    required: true,
+    min: 0
+  }
+}, { _id: false });
+
 const FacturaSchema = new Schema({
-    total: {
-        type: Number,
-        required: [true, 'El monto total es obligatorio']
-    },
-    estado: {
-        type: String,
-        required: true,
-        enum: ['pagada', 'pendiente', 'cancelada'],
-        default: 'pendiente'
-    },
-    metodoPago: {
-        type: String,
-        required: [true, 'El método de pago es obligatorio'],
-        enum: ['Tarjeta de Crédito', 'PayPal', 'Transferencia Bancaria', 'Efectivo']
-    },
-    transaccionId: {
-        type: String,
-        trim: true,
-        sparse: true
-    },
-    // --- Relaciones ---
-    usuarioId: {
-        type: Schema.Types.ObjectId,
-        ref: 'Usuario',
-        required: [true, 'La factura debe estar asociada a un usuario']
-    }
-    // La relación con Entrada es inversa y se establece en el modelo Entrada (campo facturaId).
-    }, {
-    timestamps: true,
-    versionKey: false
-});
+  usuarioId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Usuario',
+    required: true
+  },
+  // Carrito de entradas
+  entradas: {
+    type: [EntradaCarritoSchema],
+    default: []
+  },
+  // Entrada individual
+  tipoEntrada: {
+    type: String
+  },
+  cantidad: {
+    type: Number,
+    min: 1
+  },
+  precioUnitario: {
+    type: Number,
+    min: 0
+  },
+  // Campos comunes
+  total: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  estado: {
+    type: String,
+    enum: ['pendiente', 'pagada', 'cancelada'],
+    default: 'pendiente'
+  },
+  metodoPago: {
+    type: String,
+    default: 'Tarjeta de Crédito'
+  },
+  transaccionId: {
+    type: String
+  },
+  mpPreferenceId: {
+    type: String
+  }
+}, { timestamps: true });
 
 module.exports = mongoose.model('Factura', FacturaSchema);

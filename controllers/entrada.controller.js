@@ -27,12 +27,27 @@ entradaCtrl.createEntrada = async (req, res) => {
     }
 };
 
+entradaCtrl.crearEntradaDesdeWebhook = async ({ nombre, precio, tipo, facturaId, eventoId, usuarioId }) => {
+    try {
+        const nuevaEntrada = new Entrada({
+            nombre,
+            precio,
+            tipo,
+            estado: 'vendida',
+            usuarioId,
+            facturaId,
+        });
+        const entradaCreada = await nuevaEntrada.save();
+        return entradaCreada;
+    } catch (error) {
+        console.error("Error al crear entrada desde webhook:", error.message);
+        throw error;
+    }
+};
+
 entradaCtrl.getEntradas = async (req, res) => {
     try {
         const entradas = await Entrada.find()
-            .populate('usuarioId', 'nombre email') // Trae nombre y email del usuario
-            .populate('facturaId', 'total estado') // Trae total y estado de la factura
-            .populate('eventoId', 'nombre fecha'); // Trae nombre y fecha del evento
         res.status(200).json(entradas);
     } catch (error) {
         res.status(500).json({ msg: 'Error al obtener las entradas', error: error.message });
