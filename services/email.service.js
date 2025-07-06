@@ -39,7 +39,7 @@ const crearPlantillaCorreo = (titulo, cuerpo) => {
         <div class="container">
             <div class="header"><h1>${titulo}</h1></div>
             <div class="content">${cuerpo}</div>
-            <div class="footer"><p>&copy; ${new Date().getFullYear()} TuPlataformaDeEventos. Todos los derechos reservados.</p></div>
+            <div class="footer"><p>&copy; ${new Date().getFullYear()} Pases. Todos los derechos reservados.</p></div>
         </div>
     </body>
     </html>
