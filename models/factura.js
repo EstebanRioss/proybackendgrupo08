@@ -24,6 +24,11 @@ const FacturaSchema = new Schema({
     ref: 'Usuario',
     required: true
   },
+  eventoId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Evento',
+    required: true
+  },
   // Carrito de entradas
   entradas: {
     type: [EntradaCarritoSchema],

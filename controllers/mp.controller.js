@@ -196,6 +196,7 @@ mpCtrl.receiveWebhook = async (req, res) => {
 
     factura.transaccionId = dataId;
     await factura.save();
+    console.log(factura)
 
     if (factura.estado !== "pagada") return res.sendStatus(200);
 
@@ -205,6 +206,7 @@ mpCtrl.receiveWebhook = async (req, res) => {
     if (Array.isArray(factura.entradas) && factura.entradas.length > 0) {
       for (const { tipoEntrada, cantidad, precioUnitario } of factura.entradas) {
         for (let i = 0; i < cantidad; i++) {
+          console.log(factura.eventoId)
           const nuevaEntrada = new Entrada({
             nombre: `${factura.eventName} - Entrada ${tipoEntrada}`,
             tipo: tipoEntrada,
@@ -214,7 +216,8 @@ mpCtrl.receiveWebhook = async (req, res) => {
             estado: "vendida",
             eventName: factura.eventName,
             eventDescription: factura.eventDescription,
-            imageUrl: factura.imageUrl
+            imageUrl: factura.imageUrl,
+            eventoId: factura.eventoId
           });
           entradasCreadas.push(nuevaEntrada.save());
         }
@@ -223,6 +226,7 @@ mpCtrl.receiveWebhook = async (req, res) => {
     // Crear entradas (caso entrada suelta)
     else if (factura.tipoEntrada && factura.cantidad && factura.precioUnitario) {
       for (let i = 0; i < factura.cantidad; i++) {
+        console.log(factura.eventoId)
         const nuevaEntrada = new Entrada({
           nombre: `${factura.eventName || ""} - Entrada ${factura.tipoEntrada}`,
           tipo: factura.tipoEntrada,
@@ -232,7 +236,8 @@ mpCtrl.receiveWebhook = async (req, res) => {
           estado: "vendida",
           eventName: factura.eventName,
           eventDescription: factura.eventDescription,
-          imageUrl: factura.imageUrl
+          imageUrl: factura.imageUrl,
+          eventoId: factura.eventoId
         });
         entradasCreadas.push(nuevaEntrada.save());
       }
@@ -242,6 +247,19 @@ mpCtrl.receiveWebhook = async (req, res) => {
 
     // Esperamos que todas las entradas se guarden
     const entradasGuardadas = await Promise.all(entradasCreadas);
+    try {
+      const evento = await Evento.findById(factura.eventoId);
+      if (!evento) {
+        console.warn(`Evento con ID ${factura.eventoId} no encontrado.`);
+      } else {
+        const cantidadVendida = entradasGuardadas.length;
+        evento.stock = Math.max(0, evento.stock - cantidadVendida);
+        await evento.save();
+        console.log(`Stock del evento ${evento._id} actualizado. Nuevo stock: ${evento.stock}`);
+      }
+    } catch (errorEvento) {
+      console.error(`Error actualizando el stock del evento ${factura.eventoId}:`, errorEvento.message);
+    }
 
     // Ahora generamos y guardamos el QR para cada entrada creada
     for (const entrada of entradasGuardadas) {
