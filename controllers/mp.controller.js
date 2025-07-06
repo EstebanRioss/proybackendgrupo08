@@ -157,8 +157,8 @@ mpCtrl.buyTicket = async (req, res) => {
 
 mpCtrl.receiveWebhook = async (req, res) => {
   const signature = req.get("x-signature");
-  const dataId = req.query["data.id"];
-  const webhookType = req.query.type;
+  const { type: webhookType, data } = req.body;
+  const dataId = data?.id;
   const [ts, hash] = signature ? signature.split(",") : [];
   const secret = process.env.WEBHOOK_SECRET;
 
@@ -192,7 +192,6 @@ mpCtrl.receiveWebhook = async (req, res) => {
       if (payment.status === "approved") nuevoEstadoFactura = "pagada";
       else if (["rejected", "cancelled"].includes(payment.status)) nuevoEstadoFactura = "cancelada";
 
-      // Actualizar estado de la factura
       factura.estado = nuevoEstadoFactura;
       factura.transaccionId = dataId;
       await factura.save();
@@ -216,7 +215,7 @@ mpCtrl.receiveWebhook = async (req, res) => {
 
       return res.status(200).send("ok");
     } catch (error) {
-      console.error("Error al procesar webhook:", error);
+      console.error("Error al procesar webhook:", error.response?.data || error.message);
       return res.status(500).send("Error procesando notificación");
     }
   }
