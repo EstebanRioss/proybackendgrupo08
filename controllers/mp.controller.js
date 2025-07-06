@@ -197,12 +197,11 @@ mpCtrl.receiveWebhook = async (req, res) => {
     factura.transaccionId = dataId;
     await factura.save();
 
-    // Si no está pagada, respondemos OK y no generamos entradas
     if (factura.estado !== "pagada") return res.sendStatus(200);
 
     const entradasCreadas = [];
 
-    // Caso compra múltiple (carrito)
+    // Crear entradas (caso carrito)
     if (Array.isArray(factura.entradas) && factura.entradas.length > 0) {
       for (const { tipoEntrada, cantidad, precioUnitario } of factura.entradas) {
         for (let i = 0; i < cantidad; i++) {
@@ -217,12 +216,11 @@ mpCtrl.receiveWebhook = async (req, res) => {
             eventDescription: factura.eventDescription,
             imageUrl: factura.imageUrl
           });
-
           entradasCreadas.push(nuevaEntrada.save());
         }
       }
-    } 
-    // Caso compra individual
+    }
+    // Crear entradas (caso entrada suelta)
     else if (factura.tipoEntrada && factura.cantidad && factura.precioUnitario) {
       for (let i = 0; i < factura.cantidad; i++) {
         const nuevaEntrada = new Entrada({
@@ -236,15 +234,29 @@ mpCtrl.receiveWebhook = async (req, res) => {
           eventDescription: factura.eventDescription,
           imageUrl: factura.imageUrl
         });
-
         entradasCreadas.push(nuevaEntrada.save());
       }
     } else {
       console.warn(`Factura ${factura._id} no tiene información válida para crear entradas.`);
     }
 
-    await Promise.all(entradasCreadas);
-    console.log(`Se crearon ${entradasCreadas.length} entradas para factura ${factura._id}`);
+    // Esperamos que todas las entradas se guarden
+    const entradasGuardadas = await Promise.all(entradasCreadas);
+
+    // Ahora generamos y guardamos el QR para cada entrada creada
+    for (const entrada of entradasGuardadas) {
+      try {
+        const qrURL = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(entrada._id.toString())}&size=200x200&format=png`;
+        const response = await axios.get(qrURL, { responseType: 'arraybuffer' });
+        const qrBase64 = `data:image/png;base64,${Buffer.from(response.data, 'binary').toString('base64')}`;
+        entrada.qr = qrBase64;
+        await entrada.save();
+      } catch (qrError) {
+        console.error(`Error generando QR para la entrada ${entrada._id}:`, qrError.message);
+      }
+    }
+
+    console.log(`Se crearon ${entradasGuardadas.length} entradas y se generaron sus QR para factura ${factura._id}`);
 
     return res.sendStatus(200);
   } catch (error) {

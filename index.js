@@ -11,7 +11,7 @@ const allowedOrigins = [process.env.FRONTEND_URL];
 app.use(cors());
 
 // Middlewares
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Rutas
 app.use('/api/eventos', require('./routes/evento.route.js'));
