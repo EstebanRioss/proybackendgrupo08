@@ -29,11 +29,11 @@ eventoCtrl.getEventosPorOrganizador = async (req, res) => {
     res.status(500).json({ msg: 'Error al obtener los eventos.', error: error.message });
   }
 };
-
 // Obtener un evento por ID
 eventoCtrl.getEvento = async (req, res) => {
   try {
-      const evento = await Evento.findById(req.params.id);
+      const evento = await Evento.findById(req.params.id).populate('categoriaId', 'nombre')
+          .populate('organizadorId', 'nombre email')
       if (!evento) return res.status(404).json({ msg: 'Evento no encontrado.' });
       res.json(evento);
     } catch (error) {
