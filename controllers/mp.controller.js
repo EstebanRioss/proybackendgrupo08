@@ -3,6 +3,8 @@ const crypto = require("crypto");
 const Factura = require("../models/factura");
 const Entrada = require('../models/entrada');
 const entradaCtrl = require("./entrada.controller");
+const Usuario = require("../models/usuario")
+const emailService = require("../services/email.service")
 const mpCtrl = {};
 /**
  * Compra con carrito: varias entradas
@@ -268,17 +270,17 @@ mpCtrl.receiveWebhook = async (req, res) => {
         const response = await axios.get(qrURL, { responseType: 'arraybuffer' });
         const qrBase64 = `data:image/png;base64,${Buffer.from(response.data, 'binary').toString('base64')}`;
         entrada.qr = qrBase64;
-        await entrada.save();
-
-        const usuario = await Usuario.findById(entrada.usuarioId);
+        const usuario = await Usuario.findById(entrada.usuarioId).select('-contraseña -googleId');
+        console.log(usuario);
         const userEmail = usuario ? usuario.email : null;
 
         await emailService.enviarCompraEntrada(userEmail, qrBase64);
+
+        await entrada.save();
       } catch (qrError) {
         console.error(`Error generando QR para la entrada ${entrada._id}:`, qrError.message);
       }
     }
-
 
 
     console.log(`Se crearon ${entradasGuardadas.length} entradas y se generaron sus QR para factura ${factura._id}`);
