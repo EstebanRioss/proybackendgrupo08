@@ -48,6 +48,40 @@ const crearPlantillaCorreo = (titulo, cuerpo) => {
 
 // 3. Objeto que encapsula y exporta todas las funciones del servicio
 const emailService = {};
+/**
+ * Envía un correo con la entrada del evento y su código QR.
+ * @param {string} email - Email del destinatario.
+ * @param {string} eventName - Nombre del evento.
+ * @param {string} qrBase64 - Código QR de la entrada en formato base64.
+ */
+emailService.enviarCorreoEntradaConQR = async (email, eventName, qrBase64) => {
+    const titulo = `¡Aquí tienes tu entrada para ${eventName}!`;
+    const cuerpo = `
+        <p>¡Gracias por tu compra, <strong>${email}</strong>!</p>
+        <p>Tu pago se ha procesado correctamente. Muestra el siguiente código QR en el acceso al evento:</p>
+        <div style="text-align:center; margin: 25px 0;">
+            <img src="cid:qr-code" alt="Código QR para tu entrada" />
+        </div>
+        <p>¡Esperamos que disfrutes del evento!</p>
+    `;
+    const html = crearPlantillaCorreo(titulo, cuerpo);
+
+    // Extraemos solo los datos base64, quitando el prefijo que a veces se incluye.
+    const base64Data = qrBase64.split(';base64,').pop();
+
+    await transporter.sendMail({
+        from: process.env.user,
+        to: email,
+        subject: titulo,
+        html,
+        attachments: [{
+            filename: 'entrada-qr.png',
+            content: base64Data,
+            encoding: 'base64',
+            cid: 'qr-code' // ID de contenido para la imagen embebida
+        }]
+    });
+};
 
 // --- Definición de las funciones del servicio ---
 
