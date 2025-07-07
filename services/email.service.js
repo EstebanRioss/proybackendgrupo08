@@ -67,6 +67,24 @@ emailService.enviarCorreoConfirmacion = async (email, token) => {
     await transporter.sendMail({ from: process.env.user, to: email, subject: titulo, html });
 };
 
+emailService.enviarCompraEntrada = async (email, token, imagenBase64) => {
+    const titulo = "Gracias por comprar tu entrada";
+    const cuerpo = `
+        <p>¡Gracias por comprar tu entrada, <strong>${email}</strong>!</p>
+        <p>Acaba de comprar una entrada se le adjunta su correspendiente qr para poder asistir al evento</p>
+        <div style="text-align:center; margin-top:20px;">
+            <img src="data:image/png;base64,${imagenBase64}" alt="Entrada" style="max-width:100%; height:auto;" />
+        </div>
+    `;
+    const html = crearPlantillaCorreo(titulo, cuerpo);
+    await transporter.sendMail({
+        from: process.env.user,
+        to: email,
+        subject: titulo,
+        html,
+    });
+};
+
 /**
  * Notifica a un administrador sobre una nueva solicitud de rol de organizador.
  * @param {string} adminEmail - Email del administrador a notificar.
