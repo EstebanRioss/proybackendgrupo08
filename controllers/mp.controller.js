@@ -269,6 +269,7 @@ mpCtrl.receiveWebhook = async (req, res) => {
         const qrBase64 = `data:image/png;base64,${Buffer.from(response.data, 'binary').toString('base64')}`;
         entrada.qr = qrBase64;
         await entrada.save();
+        await emailService.enviarCorreoEntradaConQR(userEmail, entrada.eventName, qrBase64);
       } catch (qrError) {
         console.error(`Error generando QR para la entrada ${entrada._id}:`, qrError.message);
       }
